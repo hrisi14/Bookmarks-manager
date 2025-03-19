@@ -1,6 +1,7 @@
 package bg.sofia.uni.fmi.mjt.bookmarksmanager;
 
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.bookmark.Bookmark;
+import bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.GroupAlreadyExistsException;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.InvalidCredentialsException;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.NoSuchBookmarkException;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.NoSuchGroupException;
@@ -12,6 +13,7 @@ import bg.sofia.uni.fmi.mjt.bookmarksmanager.finder.BookmarksFinder;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.server.storage.UsersStorage;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.user.User;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
@@ -19,26 +21,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+//Here I use the Facade design pattern to separate storage from command handling
 
-public class BookmarksManager implements BookmarksManagerAPI{
+public class BookmarksManager implements BookmarksManagerAPI {
 
     private static final String NOT_LOGGED_WARNING = "User must " +
             "have logged in before using the app's commands!";
 
     private static final String INVALID_COMMAND_PARAMS = "Invalid command's " +
-            "parameters (group name or bookmark).";
+            "parameters- group name or bookmark!";
 
-    private final Map<SocketChannel, User> loggedInUsers; //manages users's login sessions
+    private static final String INEXISTENT_GROUP_BOOKMARK = "User does" +
+            " not have such a group/bookmark!";
+
+    private final Map<SocketChannel, User> loggedInUsers; //manages users' login sessions
     private final UsersStorage usersStorage;
     private final BookmarksFinder finder;
 
+
     public BookmarksManager() {
         this.loggedInUsers = new HashMap<>();
-        this.usersStorage = new UsersStorage();
+        this.usersStorage = new UsersStorage(REGISTERED_USERS_FILE);
         this.finder = new BookmarksFinder();
     }
 
-    public BookmarksManager(Map<SocketChannel, User> loggedInUsers, UsersStorage usersStorage, BookmarksFinder finder) {
+    public BookmarksManager(Map<SocketChannel, User> loggedInUsers,
+                            UsersStorage usersStorage, BookmarksFinder finder) {
         this.loggedInUsers = loggedInUsers;
         this.usersStorage = usersStorage;
         this.finder = finder;
@@ -49,23 +57,38 @@ public class BookmarksManager implements BookmarksManagerAPI{
 
     @Override
     public String register(SocketChannel clientChannel, String username, String password) {
-        if (usersStorage.isARegisteredUser(username)) {
-            ExceptionsLogger.logClientException(new UserAlreadyExistsException(""));
-
+        if (username == null || username.isEmpty() ||
+                username.isBlank()) {
+            ExceptionsLogger.logClientException(new IllegalArgumentException(String.
+                    format("Invalid username %s or password %s", username, password)));
+            return "Username/password " +
+                    "must not be null or blank!";
+        }
+        String result;
+        try {
+            result = usersStorage.register(username, password);
+        } catch (UserAlreadyExistsException e) {
+            ExceptionsLogger.logClientException(e);
             return String.format("User with username %s already exists!", username);
         }
-        return usersStorage.register(username, password);
+        return result;
     }
 
     @Override
     public String login(SocketChannel clientChannel, String username, String password) {
         if (username == null || username.isEmpty() ||
-                username.isBlank()) {
-           throw new IllegalArgumentException("Username can not" +
-                    " be null or blank!");
+                username.isBlank() || password == null || password.isEmpty() ||
+                password.isBlank())  {
+            ExceptionsLogger.logClientException( new
+                    IllegalArgumentException("Username/password" +
+                    " can not be null or blank!"));
+
+            return "Username/password " +
+                    "must not be null or blank!";
         }
         if (!usersStorage.isARegisteredUser(username)) {
-            throw new NoSuchUserException("Non-existent user trying to log in!");
+            throw new NoSuchUserException("There is no" +
+                    " registered user with username " + username);
         }
 
         if (loggedInUsers.containsKey(clientChannel)) {
@@ -83,48 +106,56 @@ public class BookmarksManager implements BookmarksManagerAPI{
 
     @Override
     public String createNewBookmarksGroup(SocketChannel clientChannel, String groupName) {
+        if (clientChannel == null) {
+            return "Communication problem occurred. " +
+                    "Try to connect again.";
+        }
         if (!hasUserLoggedIn(clientChannel)) {
             return NOT_LOGGED_WARNING;
         }
-
         if (groupName == null || groupName.isEmpty() ||
                 groupName.isBlank()) {
            ExceptionsLogger.logClientException(new IllegalArgumentException("New " +
                    "group name can not be null!"));
-            return INVALID_COMMAND_PARAMS;
+            return INVALID_COMMAND_PARAMS + "group name: " + groupName;
         }
-
         try {
             User loggedInUser = loggedInUsers.get(clientChannel);
-            loggedInUser.getStorage().createNewGroup(groupName, loggedInUser.getUsername());
+            loggedInUser.getStorage().createNewGroup(groupName);
             usersStorage.updateUser(loggedInUser.getUsername(), loggedInUser);
-
             return String.format("Successful creation of bookmarks " +
                     "group %s for user %s", groupName, loggedInUser.getUsername());
-        } catch (Exception e) {
+        } catch (GroupAlreadyExistsException e) {
             ExceptionsLogger.logClientException(e);
-            return INVALID_COMMAND_PARAMS;
+            return "Such a group already exists. Please, try with another name.";
         }
     }
 
     @Override
-    public String addNewBookmarkToGroup(SocketChannel clientChannel, String groupName, String url, boolean isShortened) {
+    public String addNewBookmarkToGroup(SocketChannel clientChannel, String groupName,
+                                        String url, boolean isShortened) {
         if (!hasUserLoggedIn(clientChannel)) {
             return NOT_LOGGED_WARNING;
         }
         User loggedInUser = loggedInUsers.get(clientChannel);
         try {
-
             loggedInUser.getStorage().addNewBookmarkToGroup(Bookmark.of(url, groupName,
-                    isShortened), groupName, loggedInUser.getUsername());
-        } catch (NoSuchGroupException | NoSuchBookmarkException | IllegalArgumentException e) {
+                    isShortened), groupName);
+        } catch (NoSuchGroupException e) {
+            ExceptionsLogger.logClientException(e);
+            return INEXISTENT_GROUP_BOOKMARK;
+        } catch (IllegalStateException e) {
+            ExceptionsLogger.logClientException(e);
+            return "Could not shorten link! Original url returned!";
+        } catch (IllegalArgumentException e) {
             ExceptionsLogger.logClientException(e);
             return INVALID_COMMAND_PARAMS;
         }
         usersStorage.updateUser(loggedInUser.getUsername(), loggedInUser);
         invalidateFinder(loggedInUser.getUsername());
         return String.format("Successful add of bookmark %s " +
-                "to group %s of user %s", url, groupName, loggedInUser.getUsername());
+                "to group %s of user %s", url, groupName,
+                loggedInUser.getUsername());
     }
 
     @Override
@@ -132,11 +163,13 @@ public class BookmarksManager implements BookmarksManagerAPI{
         if (!hasUserLoggedIn(clientChannel)) {
             return NOT_LOGGED_WARNING;
         }
-
         User loggedInUser = loggedInUsers.get(clientChannel);
         try {
-            loggedInUser.getStorage().removeBookmarkFromGroup(bookmarkTitle, groupName, loggedInUser.getUsername());
-        } catch (NoSuchGroupException | NoSuchBookmarkException | IllegalArgumentException e)  {
+            loggedInUser.getStorage().removeBookmarkFromGroup(bookmarkTitle, groupName);
+        } catch (NoSuchGroupException | NoSuchBookmarkException e)  {
+            ExceptionsLogger.logClientException(e);
+            return INEXISTENT_GROUP_BOOKMARK;
+        } catch (IllegalArgumentException e) {
             ExceptionsLogger.logClientException(e);
             return INVALID_COMMAND_PARAMS;
         }
@@ -206,24 +239,40 @@ public class BookmarksManager implements BookmarksManagerAPI{
 
     @Override
     public List<Bookmark> importFromChrome(SocketChannel clientChannel) {
+        if (!hasUserLoggedIn(clientChannel)) {
+            throw new UserNotLoggedInException("User with socket channel "
+                    + clientChannel.toString() + "has not logged in!");
+        }
        return loggedInUsers.get(clientChannel).
                getStorage().importBookmarksFromChrome();
-
     }
 
+    @Override
+    public void disconnectUser(SocketChannel clientChannel) {
+        if (loggedInUsers.containsKey(clientChannel)) {
+            User disconnectedUser = loggedInUsers.get(clientChannel);
+            disconnectedUser.getStorage().updateGroupsFile();
+            loggedInUsers.remove(clientChannel);
+        }
+        usersStorage.saveUsers();
+    }
+
+    @Override
+    public Map<SocketChannel, User> getLoggedInUsers() {
+        return loggedInUsers;
+    }
 
     private boolean hasUserLoggedIn(SocketChannel clientChannel) {
         try {
             if (!loggedInUsers.containsKey(clientChannel)) {
-                ExceptionsLogger.logClientException(new UserNotLoggedInException
-                        (String.format("Inexistent user with " +
-                                        "socket channel address %s trying to log in.",
-                                clientChannel.getLocalAddress().toString())));
+                ExceptionsLogger.logClientException(new UserNotLoggedInException(String.format(
+                        "User with socket channel address %s has not logged in!",
+                        clientChannel.getLocalAddress())));
                 return false;
             }
         } catch (IOException e) {
-            ExceptionsLogger.logClientException(new UserNotLoggedInException
-                    ("Not logged in user. Can't get socket channel."));
+            ExceptionsLogger.logClientException(e);
+            return false;
         }
         return true;
     }

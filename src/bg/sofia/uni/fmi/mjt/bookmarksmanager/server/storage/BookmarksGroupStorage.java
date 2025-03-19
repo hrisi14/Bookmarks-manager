@@ -7,32 +7,35 @@ import bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.NoSuchBookmarkException;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.NoSuchGroupException;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.logger.ExceptionsLogger;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.outerimport.ChromeImporter;
+import bg.sofia.uni.fmi.mjt.bookmarksmanager.user.User;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Serializable;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static java.nio.file.Files.exists;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-
-public class BookmarksGroupStorage {
+public class BookmarksGroupStorage implements Serializable {
+    private static final int ERROR_STATUS_CODE = 404 ;
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     //saves users bookmarks in files in JSON format
     //all the groups of ONE user
@@ -40,26 +43,25 @@ public class BookmarksGroupStorage {
     //Serialization & Deserialization – To store and load bookmarks from a file.
     //Atomic Updates – To ensure that file modifications reflect in memory (groups map).
 
-    private final String GROUP_FILE_PATH = "src" + File.separator +
-            "bg" + File.separator + "sofia" + File.separator +
-            "uni" + File.separator + "fmi" + File.separator + "mjt" +
-            File.separator + "bookmarksmanager" + File.separator + "server"
-            + File.separator + "storage" + File.separator + "bookmarksfiles" + File.separator;
-
     private final Map<String, BookmarksGroup> groups;
-    private final String ownerUsername;
+    transient
+    private final String fileName;
 
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 
-    public BookmarksGroupStorage(String username) {
-        this.ownerUsername = username;
+    public BookmarksGroupStorage(String fileName) {
         this.groups = new HashMap<>();
+        this.fileName = fileName;
+
+        if (!exists(Path.of(fileName))) {
+            FileCreator.createFile(fileName);
+        }
     }
 
-    public BookmarksGroupStorage(Map<String, BookmarksGroup> groups, String username) {
+     public BookmarksGroupStorage(Map<String, BookmarksGroup> groups, String fileName) {
         this.groups = groups;
-        this.ownerUsername = username;
+        this.fileName = fileName;
+        FileCreator.createFile(this.fileName);
     }
 
     public Map<String, BookmarksGroup> getGroups() {
@@ -71,23 +73,17 @@ public class BookmarksGroupStorage {
         //groupName so there is no need to do it here
     }
 
-    public void createNewGroup(String groupName, String username) {
+    public void createNewGroup(String groupName) {
         if (groups.containsKey(groupName)) {
             throw new GroupAlreadyExistsException(String.format("A " +
                     "group with name %s already exists", groupName));
         }
 
-        File usersDir = new File(GROUP_FILE_PATH + ownerUsername);
-
-        if (!usersDir.exists()) {
-            usersDir.mkdirs();
-        }
-
-        FileCreator.createFile(usersDir + groupName);
         groups.put(groupName, new BookmarksGroup(groupName, new HashMap<>()));
+        //updateGroupsFile();
     }
 
-    public void addNewBookmarkToGroup(Bookmark bookmark, String groupName, String username) {
+    public void addNewBookmarkToGroup(Bookmark bookmark, String groupName) {
         if (groupName == null || groupName.isEmpty() || groupName.isBlank() ||
                 bookmark == null) {
             throw new IllegalArgumentException("Group's name/bookmark can not be null!");
@@ -96,12 +92,14 @@ public class BookmarksGroupStorage {
             throw new NoSuchGroupException(String.format("There is no group %s.",
                     groupName));
         }
+        if (groups.get(groupName).getBookmarks().contains(bookmark)) {
+            return;
+        }
         groups.get(groupName).addNewBookmark(bookmark);
-        String groupFile = GROUP_FILE_PATH + ownerUsername + File.separator + groupName;
-        updateGroupFile(groupFile, List.of(bookmark), true);
+        updateGroupsFile();
     }
 
-    public void removeBookmarkFromGroup(String bookmarkTitle, String groupName, String username) {
+    public void removeBookmarkFromGroup(String bookmarkTitle, String groupName) {
         if (groupName == null || groupName.isEmpty() || groupName.isBlank() ||
                 bookmarkTitle == null || bookmarkTitle.isEmpty() ||
                 bookmarkTitle.isBlank()) {
@@ -121,36 +119,20 @@ public class BookmarksGroupStorage {
             throw new NoSuchBookmarkException(String.format("Group %s has " +
                     "no bookmark %s to be removed!", groupName, bookmarkTitle));
         }
-
         groups.get(groupName).removeBookmark(toRemove);
-
-        String groupFile = GROUP_FILE_PATH + username + File.separator + groupName;
-        updateGroupFile(groupFile,
-                groups.get(groupName).getBookmarks(), false);
+        updateGroupsFile();
     }
 
     public void cleanUp() {
-        List<String> groupsToUpdate = new ArrayList<>();
-        try (ExecutorService executor = Executors.newCachedThreadPool()) {
-            HttpClient client = HttpClient.newBuilder().executor(executor).build();
-            for (Map.Entry<String, BookmarksGroup> groupEntry: groups.entrySet()) {
-                Set<Bookmark> invalidBookmarks = ConcurrentHashMap.newKeySet();
+        try (ExecutorService executor = Executors.newCachedThreadPool();
+            HttpClient client = HttpClient.newBuilder().executor(executor).
+                    version(HttpClient.Version.HTTP_2).build()) {
+            for (Map.Entry<String, BookmarksGroup> groupEntry : groups.entrySet()) {
                 BookmarksGroup currentGroup = groupEntry.getValue();
-                  List <CompletableFuture<Void>> futuresOfInvalidBookmarks = currentGroup.getBookmarks().stream().
-                            map(bookmark ->  {HttpRequest request = HttpRequest.newBuilder().
-                                    uri(URI.create(bookmark.url())).build();
-                                return client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                                        .thenApply(HttpResponse::statusCode).thenAccept(statusCode ->
-                                        { if (statusCode == 404) {invalidBookmarks.add(bookmark);}});}).toList();
-                  CompletableFuture.allOf(futuresOfInvalidBookmarks.toArray(new
-                          CompletableFuture[0])).thenRun(()->
-                          currentGroup.getBookmarks().removeIf(invalidBookmarks::contains));
-                  if (!invalidBookmarks.isEmpty()) {
-                      groupsToUpdate.add(currentGroup.groupName());
-                  }
+                handleInvalidBookmarks(executor, client, currentGroup);
             }
         }
-        updateGroupsFile(groupsToUpdate, false);
+        updateGroupsFile();
     }
 
     public List<Bookmark> importBookmarksFromChrome() {
@@ -161,34 +143,76 @@ public class BookmarksGroupStorage {
         }
         for (Map.Entry<String, BookmarksGroup> groupEntry: chromeGroups.entrySet()) {
             if (!groups.containsKey(groupEntry.getKey())) {
-                String newGroupFile = groupEntry.getKey()+".txt";
-                FileCreator.createFile(newGroupFile);
                 groups.put(groupEntry.getKey(), groupEntry.getValue());
-                updateGroupFile(newGroupFile, groupEntry.getValue().
-                        getBookmarks(), false);
             }
         }
+        updateGroupsFile();
         return chromeGroups.values().stream().map(BookmarksGroup::
                 getBookmarks).flatMap(Collection::stream).toList();
-
     }
 
-    //Files' functions
-    private void updateGroupFile(String fileName, List<Bookmark> bookmarks, boolean append) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName,append))) {
-            for (Bookmark bookmark : bookmarks) {
-                writer.write(GSON.toJson(bookmark));
-                writer.newLine();
-            }
+    public void updateGroupsFile() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
+            //for (BookmarksGroup group : groups.values()) {
+              //  writer.write(GSON.toJson(group));
+                //writer.newLine();
+
+                writer.write(GSON.toJson(this));
+            //}
         } catch (IOException e) {
-           ExceptionsLogger.logClientException(e);
+            ExceptionsLogger.logClientException(e);
         }
     }
 
-    private void updateGroupsFile(List<String> groupNames, boolean append) {
-      groupNames.stream()
-                .forEach(groupName -> updateGroupFile(GROUP_FILE_PATH + ownerUsername + File.separator + groupName,
-                        groups.get(groupName).getBookmarks(),
-                        append));
+    public String getFileName() {
+        return fileName;
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+
+        if (!(obj instanceof BookmarksGroupStorage)) {
+            return false;
+        }
+        BookmarksGroupStorage storage = (BookmarksGroupStorage) obj;
+
+        return fileName.equals(storage.getFileName()) &&
+                groups.entrySet().containsAll(storage.
+                        getGroups().entrySet()) &&
+                storage.getGroups().entrySet().containsAll(groups.entrySet());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(groups);
+    }
+
+    private void handleInvalidBookmarks(ExecutorService executor, HttpClient client,
+                                                     BookmarksGroup currentGroup) {
+        Set<Bookmark> invalidBookmarks = ConcurrentHashMap.newKeySet();
+        List<CompletableFuture<Void>> futures = currentGroup.getBookmarks().stream()
+                .map(bookmark -> CompletableFuture.supplyAsync(() -> {
+                    try {
+                        HttpRequest request = HttpRequest.newBuilder()
+                                .uri(URI.create(bookmark.url())).build();
+                        HttpResponse<String> response = client.send(request,
+                                HttpResponse.BodyHandlers.ofString());
+                        return response.statusCode();
+                    } catch (IOException | InterruptedException e) {
+                        ExceptionsLogger.logClientException(e);
+                        return -1;
+                    }
+                }, executor).thenAccept(statusCode -> {
+                    if (statusCode == ERROR_STATUS_CODE) {
+                        invalidBookmarks.add(bookmark);}})).toList();
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        synchronized (currentGroup.getBookmarks()) {
+            currentGroup.removeBookmarks(invalidBookmarks);
+        }
+    }
+
+
 }

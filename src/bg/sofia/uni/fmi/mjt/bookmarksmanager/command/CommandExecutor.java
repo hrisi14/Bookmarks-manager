@@ -35,6 +35,7 @@ public class CommandExecutor {
     private static final String SEARCH_CMD = "search";
     private static final String CLEAN_UP_CMD = "cleanup";
     private static final String IMPORT_CMD = "import-from-chrome";
+    private static final String DISCONNECT_CMD = "disconnect";
 
     private final BookmarksManager manager;
 
@@ -48,9 +49,7 @@ public class CommandExecutor {
 
     public String execute(Command cmd, SocketChannel clientChannel) {
 
-        System.out.println(cmd.command());
-
-        return switch (cmd.command()) {
+            return switch (cmd.command()) {
             case REGISTER_CMD -> registerUser(clientChannel, cmd.arguments());
             case LOGIN_CMD -> login(clientChannel, cmd.arguments());
             case NEW_GROUP_CMD -> newGroup(clientChannel, cmd.arguments());
@@ -60,6 +59,7 @@ public class CommandExecutor {
             case SEARCH_CMD -> search(clientChannel, cmd.arguments());
             case CLEAN_UP_CMD -> cleanup(clientChannel, cmd.arguments());
             case IMPORT_CMD -> importFromChrome(clientChannel, cmd.arguments());
+            case DISCONNECT_CMD -> disconnectClient(clientChannel);
 
             default -> UNKNOWN_COMMAND_MESSAGE;
         };
@@ -68,7 +68,7 @@ public class CommandExecutor {
     private String registerUser(SocketChannel clientChannel, String[] args) {
         if (args.length != GENERAL_ARGS_COUNT) {
             return  String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
-                   CommandTemplate.REGISTER,  REGISTER_CMD + Arrays.toString(args));
+                   CommandTemplate.REGISTER.getCommandValue(),  REGISTER_CMD + Arrays.toString(args));
         }
         String username = args[0];
         String password = args[1];
@@ -78,13 +78,13 @@ public class CommandExecutor {
     private String login(SocketChannel clientChannel, String[] args) {
         if (args.length != GENERAL_ARGS_COUNT) {
             return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
-                    CommandTemplate.LOGIN, LOGIN_CMD + Arrays.toString(args));
+                    CommandTemplate.LOGIN.getCommandValue(), LOGIN_CMD + Arrays.toString(args));
         }
         String username = args[0];
         String password = args[1];
         try {
             return manager.login(clientChannel, username, password);
-        } catch (InvalidCredentialsException| NoSuchUserException | IllegalArgumentException e) {
+        } catch (InvalidCredentialsException| NoSuchUserException e) {
             ExceptionsLogger.logClientException(e);
             return INVALID_CREDENTIALS;
         }
@@ -93,31 +93,29 @@ public class CommandExecutor {
     private String newGroup(SocketChannel clientChannel, String[] args) {
         if (args.length != GENERAL_ARGS_COUNT - 1) {
             return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
-                    CommandTemplate.NEW_GROUP, NEW_GROUP_CMD + Arrays.toString(args));
+                    CommandTemplate.NEW_GROUP.getCommandValue(), NEW_GROUP_CMD +
+                            Arrays.toString(args));
         }
         return manager.createNewBookmarksGroup(clientChannel, args[0]);
     }
 
     private String addBookmark(SocketChannel clientChannel, String[] args) {
-        if (args.length < GENERAL_ARGS_COUNT || args.length > GENERAL_ARGS_COUNT + 1 ||
-        args.length == GENERAL_ARGS_COUNT + 1 && !Objects.equals(args[2], SHORTEN_FLAG)) {
-            return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
-                    CommandTemplate.ADD, ADD_CMD + Arrays.toString(args)) ;
-        }
         if (args.length == GENERAL_ARGS_COUNT) {
-            System.out.println(Arrays.toString(args));
-            return manager.addNewBookmarkToGroup(clientChannel, args[0], args[1], false);
+           return manager.addNewBookmarkToGroup(clientChannel, args[0], args[1], false);
         }
-        return manager.addNewBookmarkToGroup(clientChannel, args[0], args[1], true);
+        if (args.length == GENERAL_ARGS_COUNT + 1 && Objects.equals(args[2], SHORTEN_FLAG)) {
+            return manager.addNewBookmarkToGroup(clientChannel, args[0], args[1], true);
+        }
+        return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
+                CommandTemplate.ADD.getCommandValue(),
+                ADD_CMD + Arrays.toString(args));
     }
 
     private String removeBookmark(SocketChannel clientChannel, String[] args)  {
-        System.out.println(Arrays.toString(args));
-
-        if (args.length != GENERAL_ARGS_COUNT) {
-            ExceptionsLogger.logClientException(new InvalidCommandException(""));
-            return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
-                   CommandTemplate.REMOVE, REMOVE_CMD + Arrays.toString(args)) ;
+      if (args.length != GENERAL_ARGS_COUNT) {
+          return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
+                   CommandTemplate.REMOVE.getCommandValue(),
+                  REMOVE_CMD + Arrays.toString(args));
         }
        return manager.removeBookmarkFromGroup(clientChannel, args[0], args[1]);
     }
@@ -127,7 +125,7 @@ public class CommandExecutor {
             if (args.length == 0) {
                 List<Bookmark> bookmarks = manager.listAll(clientChannel);
                 return "List of all bookmarks:" + bookmarks.stream().
-                        map(Record::toString).toList();
+                        map(Record::toString);
             }
             if (args.length == GENERAL_ARGS_COUNT && "--group-name".equals(args[0])) {
                 List<Bookmark> bookmarks = manager.listByGroup(clientChannel, args[1]);
@@ -141,7 +139,9 @@ public class CommandExecutor {
             return NOT_LOGGED_WARNING;
         }
         return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
-                CommandTemplate.LIST + " or " + CommandTemplate.LIST_GROUP,  LIST_CMD + Arrays.toString(args)) ;
+                CommandTemplate.LIST.getCommandValue() + " or " +
+                        CommandTemplate.LIST_GROUP.getCommandValue(),
+                LIST_CMD + Arrays.toString(args));
     }
 
     private String search(SocketChannel clientChannel, String[] args) {
@@ -160,14 +160,15 @@ public class CommandExecutor {
             return NOT_LOGGED_WARNING;
         }
         return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
-                CommandTemplate.SEARCH_TAGS + "or" + CommandTemplate.SEARCH_TITLE,
+                CommandTemplate.SEARCH_TAGS.getCommandValue() + "or" +
+                        CommandTemplate.SEARCH_TITLE.getCommandValue(),
                 SEARCH_CMD + Arrays.toString(args)) ;
     }
 
     private String cleanup(SocketChannel clientChannel, String[] args) {
         if (args.length != 0) {
             return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
-                    CommandTemplate.CLEAN_UP, CLEAN_UP_CMD +
+                    CommandTemplate.CLEAN_UP.getCommandValue(), CLEAN_UP_CMD +
                             Arrays.toString(args));
         }
         return manager.cleanUp(clientChannel);
@@ -176,8 +177,8 @@ public class CommandExecutor {
     private String importFromChrome(SocketChannel clientChannel, String[] args) {
         if (args.length != 0) {
             return String.format(INVALID_ARGUMENTS_FORMAT_MESSAGE,
-                    CommandTemplate.IMPORT, IMPORT_CMD +
-                            Arrays.toString(args));
+                    CommandTemplate.IMPORT.getCommandValue(),
+                    IMPORT_CMD + Arrays.toString(args));
         }
         List<Bookmark> importedFromChrome = manager.importFromChrome(clientChannel);
         if (importedFromChrome == null || importedFromChrome.isEmpty()) {
@@ -186,5 +187,13 @@ public class CommandExecutor {
         return "List of Chrome bookmarks imported: " +
                 importedFromChrome.
                 stream().map(Bookmark::toString).toList();
+    }
+
+    private String disconnectClient(SocketChannel clientChannel) {
+        if (clientChannel == null) {
+            return "No such a connection to the server!";
+        }
+        manager.disconnectUser(clientChannel);
+        return "Client has been successfully disconnected from server.";
     }
 }

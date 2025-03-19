@@ -201,12 +201,9 @@ public class Server {
                         accept.configureBlocking(false);
                         accept.register(selector, SelectionKey.OP_READ);
                     }
-
                     keyIterator.remove();
                 }
-
             }
-
         } catch (IOException e) {
             throw new RuntimeException("There is a problem with the server socket", e);
         }

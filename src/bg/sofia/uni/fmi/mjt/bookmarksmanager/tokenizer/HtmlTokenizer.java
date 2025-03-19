@@ -62,7 +62,7 @@ public class HtmlTokenizer {
             Document doc = Jsoup.connect(url).get();
             return doc.title().strip().replaceAll(" +", "-");
         } catch (IOException e) {
-            ExceptionsLogger.logClientException(e);   //to put error logging here!!!
+            ExceptionsLogger.logClientException(e);
         }
         return null;
     }
@@ -73,14 +73,9 @@ public class HtmlTokenizer {
             String pageText = getText(doc);
             return tokenize(pageText);
         } catch (IOException e) {
-            e.printStackTrace();   //to put error logging here!!!
+            ExceptionsLogger.logClientException(e);
         }
         return null;
-    }
-
-
-    public Set<String> getStopWords() {
-        return stopwords;
     }
 
     public Set<String> tokenize(String input) {

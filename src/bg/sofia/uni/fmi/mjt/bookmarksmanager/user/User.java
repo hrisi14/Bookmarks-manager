@@ -1,13 +1,14 @@
 package bg.sofia.uni.fmi.mjt.bookmarksmanager.user;
 
-import bg.sofia.uni.fmi.mjt.bookmarksmanager.BookmarksManagerAPI;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.server.storage.BookmarksGroupStorage;
+import java.io.Serializable;
+import java.util.Objects;
 
-public class User{
+public class User implements Serializable {
 
     private  String username;
     private  String password;
-    private  final BookmarksGroupStorage storage;
+    private final BookmarksGroupStorage storage;
 
     public User(String username, String password, BookmarksGroupStorage storage) {
         this.username = username;
@@ -22,7 +23,7 @@ public class User{
             throw new IllegalArgumentException("User password " +
                     "can not be null or empty!");
         }
-        this.password = password;
+        this.password = newPassword;
     }
 
     public void setUsername(String username) {
@@ -40,7 +41,7 @@ public class User{
             throw new IllegalArgumentException("User password " +
                     "can not be null or empty!");
         }
-        return passwordToCheck.equals(password);
+        return passwordToCheck.equals(this.password);
     }
 
     public String getUsername() {
@@ -49,5 +50,24 @@ public class User{
 
     public BookmarksGroupStorage getStorage() {
         return storage;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+
+        if (!(obj instanceof User)) {
+            return false;
+        }
+        User user = (User) obj;
+        return username.equals(user.getUsername()) &&
+                storage.equals(user.getStorage());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(username, password);
     }
 }

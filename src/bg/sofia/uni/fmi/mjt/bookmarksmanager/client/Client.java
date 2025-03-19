@@ -46,18 +46,18 @@ public class Client {
             displayPossibleCommands();
             return false;
         }
-        if (CommandTemplate.DISCONNECT.toString().equals(message))
-        {
-            System.out.println("Quiting communication with server.");
-            socketChannel.close();
-            return true;
-        }
         System.out.println("Sending message <" + message + "> to the server...");
         buffer.clear(); // switch to writing mode
         buffer.put(message.getBytes()); // buffer fill
         buffer.flip(); // switch to reading mode
         socketChannel.write(buffer); // buffer drain
         getServerMessage(socketChannel);
+        if (CommandTemplate.DISCONNECT.toString().equals(message))
+        {
+            System.out.println("Quiting communication with server.");
+            socketChannel.close();
+            return true;
+        }
         return false;
     }
 

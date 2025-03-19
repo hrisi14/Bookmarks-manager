@@ -69,7 +69,7 @@ public class ChromeImporter {
             if (URL_CHROME_FIELD.equals(type)) {
                 String title = bookmarkNode.get(BOOKMARK_NAME_CHROME_FIELD).getAsString();
                 String url = bookmarkNode.get(URL_CHROME_FIELD).getAsString();
-                chromeGroup.addNewBookmark(new Bookmark(title, url, tokenizer.getKeywords(url), chromeGroup.groupName()));
+                chromeGroup.addNewBookmark(new Bookmark(title, url, tokenizer.getKeywords(url), chromeGroup.getGroupName()));
             } else if (FOLDER_CHROME_FIELD.equals(type)) {
                 JsonArray subChildren = bookmarkNode.getAsJsonArray(BOOKMARKS_LIST_FIELD);
                 if (subChildren != null) {
