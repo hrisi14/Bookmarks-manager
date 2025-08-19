@@ -23,7 +23,7 @@ public class ShortenLinkAPIHandler {
     private static final String SHORTENED_LINK_KEY = "link";
 
     private static final int SUCCESS_CODE = 200;
-    private static final HttpClient CLIENT = HttpClient.newHttpClient();
+    private static HttpClient client = HttpClient.newHttpClient();
 
     static {
         if (BITLY_API_KEY == null || BITLY_API_KEY.isBlank()) {
@@ -49,7 +49,7 @@ public class ShortenLinkAPIHandler {
                 .build();
 
         try {
-            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == SUCCESS_CODE) {
                 Map<?, ?> responseBody = gson.fromJson(response.body(), Map.class);

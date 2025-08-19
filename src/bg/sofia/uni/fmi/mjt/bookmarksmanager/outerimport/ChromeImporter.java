@@ -69,7 +69,8 @@ public class ChromeImporter {
             if (URL_CHROME_FIELD.equals(type)) {
                 String title = bookmarkNode.get(BOOKMARK_NAME_CHROME_FIELD).getAsString();
                 String url = bookmarkNode.get(URL_CHROME_FIELD).getAsString();
-                chromeGroup.addNewBookmark(new Bookmark(title, url, tokenizer.getKeywords(url), chromeGroup.getGroupName()));
+                chromeGroup.addNewBookmark(new Bookmark(title, url, tokenizer.getKeywords(url),
+                        chromeGroup.getGroupName()));
             } else if (FOLDER_CHROME_FIELD.equals(type)) {
                 JsonArray subChildren = bookmarkNode.getAsJsonArray(BOOKMARKS_LIST_FIELD);
                 if (subChildren != null) {
@@ -87,7 +88,7 @@ public class ChromeImporter {
             return userHome + WINDOWS_BOOKMARKS_PATH;
         } else if (osName.contains("linux") || osName.contains("unix")) {  // Linux
             return userHome + LINUX_BOOKMARKS_PATH;
-        } else if (osName.contains("mac")) {  // macOS
+        } else if (osName.contains("mac")) {
             return userHome + MACOS_BOOKMARKS_PATH;
         }
        ExceptionsLogger.logClientException(new UnsupportedOperationException("Unsupported" +

@@ -79,7 +79,7 @@ public class HtmlTokenizer {
     }
 
     public Set<String> tokenize(String input) {
-        System.out.println("Input:" + input);
+        //System.out.println("Input:" + input);
         Stream<String> derivedWords = getStringStream(input);
 
         Map<String, Long> wordsOccurrences = derivedWords.collect(
