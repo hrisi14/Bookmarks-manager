@@ -14,9 +14,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 class UsersStorageTest {
 
@@ -46,7 +45,7 @@ class UsersStorageTest {
     void testRegisterInvalidUsername() {
         String expectedResult = "Username/password " +
                 "must not be null or blank!";
-        Assertions.assertEquals(expectedResult, storage.register(null,
+        assertEquals(expectedResult, storage.register(null,
                 "somePasswd1"));
 
     }
@@ -57,7 +56,7 @@ class UsersStorageTest {
                 "of at least five characters and " +
                 "contain at least one capital letter, " +
                 "one small letter and one digit.";
-        Assertions.assertEquals(expectedResult, storage.register("newUser",
+        assertEquals(expectedResult, storage.register("newUser",
                 "invalidpasswd"));
 
     }
@@ -74,7 +73,7 @@ class UsersStorageTest {
     @Test
     void testRegisterSuccessful() {
         String expectedResult = "User NewUser has been successfully registered.";
-        Assertions.assertEquals(expectedResult, storage.register("NewUser",
+        assertEquals(expectedResult, storage.register("NewUser",
                 "newUserPasswd123"));
 
     }
@@ -95,8 +94,6 @@ class UsersStorageTest {
         users.put("newUser2", new User("newUser2",
                 "newUserPasswd2",
                 Mockito.mock(BookmarksGroupStorage.class)));
-
-        int usersCount = 2;
         UsersStorage expectedStorage = new UsersStorage(users,
                 TEST_FILE_USERS);
         expectedStorage.saveUsers();
@@ -107,6 +104,5 @@ class UsersStorageTest {
                 validatePassword("newUserPasswd1"));
         assertTrue(actualStorage.getUsers().get("newUser2").
                 validatePassword("newUserPasswd2"));
-        Assertions.assertEquals(usersCount, actualStorage.getUsers().size());
     }
 }

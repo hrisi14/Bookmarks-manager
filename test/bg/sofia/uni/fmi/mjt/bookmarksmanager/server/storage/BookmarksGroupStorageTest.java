@@ -11,17 +11,22 @@ import com.google.gson.GsonBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 
 class BookmarksGroupStorageTest {
@@ -155,16 +160,38 @@ class BookmarksGroupStorageTest {
     }
 
     @Test
-    void testCleanUpInvalidBookmark() {
+    void testCleanUpInvalidBookmark() throws Exception {
         Bookmark invalidBookmark = new Bookmark("Invalid",
                 "https://example.com/nonexistentpage",
                 Set.of("noExistent"), "Group1");
-        bookmarksGroupStorage.addNewBookmarkToGroup(invalidBookmark,
-                "Group1");
+        bookmarksGroupStorage.addNewBookmarkToGroup(invalidBookmark, "Group1");
+        try (MockedStatic<HttpClient> httpClientStatic = mockStatic(HttpClient.class)) {
+            HttpClient.Builder builder = mock(HttpClient.Builder.class);
+            HttpClient client = mock(HttpClient.class);
 
-        bookmarksGroupStorage.cleanUp();
-        assertFalse(bookmarksGroupStorage.getGroups().
-                get("Group1").containsBookmark("Invalid"));
+            HttpResponse<String> resp404 = (HttpResponse<String>) mock(HttpResponse.class);
+            when(resp404.statusCode()).thenReturn(404);
+
+            HttpResponse<String> resp200 = (HttpResponse<String>) mock(HttpResponse.class);
+            when(resp200.statusCode()).thenReturn(200);
+            when(HttpClient.newBuilder()).thenReturn(builder);
+            when(builder.executor(any())).thenReturn(builder);
+            when(builder.version(any())).thenReturn(builder);
+            when(builder.build()).thenReturn(client);
+
+            when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenAnswer(inv -> {
+                        HttpRequest req = inv.getArgument(0);
+                        if (req != null && req.uri().toString().contains("/nonexistentpage")) {
+                            return resp404;
+                        }
+                        return resp200;
+                    });
+
+            bookmarksGroupStorage.cleanUp();
+        }
+        assertFalse(bookmarksGroupStorage.getGroups()
+                .get("Group1").containsBookmark("Invalid"));
     }
 
     @Test

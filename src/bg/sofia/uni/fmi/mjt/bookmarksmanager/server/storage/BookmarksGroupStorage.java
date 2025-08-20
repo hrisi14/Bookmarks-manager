@@ -34,7 +34,7 @@ import java.util.concurrent.Executors;
 import static java.nio.file.Files.exists;
 
 public class BookmarksGroupStorage implements Serializable {
-    private static final int ERROR_STATUS_CODE = 404 ;
+    private static final int ERROR_STATUS_CODE = 400 ;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     //saves users bookmarks in files in JSON format
@@ -58,7 +58,7 @@ public class BookmarksGroupStorage implements Serializable {
         }
     }
 
-     public BookmarksGroupStorage(Map<String, BookmarksGroup> groups, String fileName) {
+    public BookmarksGroupStorage(Map<String, BookmarksGroup> groups, String fileName) {
         this.groups = groups;
         this.fileName = fileName;
         FileCreator.createFile(this.fileName);
@@ -125,8 +125,8 @@ public class BookmarksGroupStorage implements Serializable {
 
     public void cleanUp() {
         try (ExecutorService executor = Executors.newCachedThreadPool();
-            HttpClient client = HttpClient.newBuilder().executor(executor).
-                    version(HttpClient.Version.HTTP_2).build()) {
+             HttpClient client = HttpClient.newBuilder().executor(executor).
+                     version(HttpClient.Version.HTTP_2).build()) {
             for (Map.Entry<String, BookmarksGroup> groupEntry : groups.entrySet()) {
                 BookmarksGroup currentGroup = groupEntry.getValue();
                 handleInvalidBookmarks(executor, client, currentGroup);
@@ -154,10 +154,10 @@ public class BookmarksGroupStorage implements Serializable {
     public void updateGroupsFile() {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
             //for (BookmarksGroup group : groups.values()) {
-              //  writer.write(GSON.toJson(group));
-                //writer.newLine();
+            //  writer.write(GSON.toJson(group));
+            //writer.newLine();
 
-                writer.write(GSON.toJson(this));
+            writer.write(GSON.toJson(this));
             //}
         } catch (IOException e) {
             ExceptionsLogger.logClientException(e);
@@ -191,7 +191,7 @@ public class BookmarksGroupStorage implements Serializable {
     }
 
     private void handleInvalidBookmarks(ExecutorService executor, HttpClient client,
-                                                     BookmarksGroup currentGroup) {
+                                        BookmarksGroup currentGroup) {
         Set<Bookmark> invalidBookmarks = ConcurrentHashMap.newKeySet();
         List<CompletableFuture<Void>> futures = currentGroup.getBookmarks().stream()
                 .map(bookmark -> CompletableFuture.supplyAsync(() -> {
@@ -206,13 +206,11 @@ public class BookmarksGroupStorage implements Serializable {
                         return -1;
                     }
                 }, executor).thenAccept(statusCode -> {
-                    if (statusCode == ERROR_STATUS_CODE) {
+                    if (statusCode >= ERROR_STATUS_CODE) {
                         invalidBookmarks.add(bookmark);}})).toList();
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         synchronized (currentGroup.getBookmarks()) {
             currentGroup.removeBookmarks(invalidBookmarks);
         }
     }
-
-
 }
