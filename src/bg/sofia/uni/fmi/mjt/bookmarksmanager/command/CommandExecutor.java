@@ -125,7 +125,7 @@ public class CommandExecutor {
             if (args.length == 0) {
                 List<Bookmark> bookmarks = manager.listAll(clientChannel);
                 return "List of all bookmarks:" + bookmarks.stream().
-                        map(Record::toString);
+                        map(Record::toString).toList();
             }
             if (args.length == GENERAL_ARGS_COUNT && "--group-name".equals(args[0])) {
                 List<Bookmark> bookmarks = manager.listByGroup(clientChannel, args[1]);

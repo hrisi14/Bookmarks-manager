@@ -188,6 +188,7 @@ public class BookmarksManager implements BookmarksManagerAPI {
         }
         User loggedInUser = loggedInUsers.get(clientChannel);
         loggedInUser.getStorage().cleanUp();
+        invalidateFinder(loggedInUser.getUsername());
         return String.format("Successful removal of user's %s " +
                 "invalid bookmarks (if there were such)",
                 loggedInUser.getUsername());

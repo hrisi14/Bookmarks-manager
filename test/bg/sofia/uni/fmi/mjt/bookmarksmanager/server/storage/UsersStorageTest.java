@@ -4,7 +4,6 @@ import bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.UserAlreadyExistsExcepti
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.logger.ExceptionsLogger;
 import bg.sofia.uni.fmi.mjt.bookmarksmanager.user.User;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.mockito.Mockito;

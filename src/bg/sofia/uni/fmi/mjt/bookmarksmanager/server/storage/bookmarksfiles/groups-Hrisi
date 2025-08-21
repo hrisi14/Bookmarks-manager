@@ -1,0 +1,54 @@
+{
+  "groups": {
+    "Group1": {
+      "groupName": "Group1",
+      "bookmarks": {
+        "Gymshark-Official-Store---Gym-Clothes-\u0026-Workout-Clothes": {
+          "title": "Gymshark-Official-Store---Gym-Clothes-\u0026-Workout-Clothes",
+          "url": "https://eu.gymshark.com/",
+          "keywords": [
+            "new",
+            "seamless",
+            "run",
+            "best",
+            "accessori",
+            "leg",
+            "everyday",
+            "fit",
+            "unit",
+            "top",
+            "price",
+            "men",
+            "short",
+            "gym",
+            "regular"
+          ],
+          "groupName": "Group1"
+        },
+        "GitHub-·-Build-and-ship-software-on-a-single,-collaborative-platform-·-GitHub": {
+          "title": "GitHub-·-Build-and-ship-software-on-a-single,-collaborative-platform-·-GitHub",
+          "url": "https://github.com/",
+          "keywords": [
+            "github",
+            "copilot",
+            "code",
+            "read",
+            "work",
+            "project",
+            "source",
+            "platform",
+            "search",
+            "security",
+            "fix",
+            "build",
+            "developer",
+            "support",
+            "customer"
+          ],
+          "groupName": "Group1"
+        }
+      }
+    }
+  },
+  "URL": "https://chatgpt.com/"
+}

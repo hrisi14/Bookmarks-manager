@@ -20,8 +20,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,10 +33,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static bg.sofia.uni.fmi.mjt.bookmarksmanager.exceptions.logger.ExceptionsLogger.logSth;
 import static java.nio.file.Files.exists;
 
 public class BookmarksGroupStorage implements Serializable {
-    private static final int ERROR_STATUS_CODE = 400 ;
+    private static final int ERROR_STATUS_CODE = 400;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     //saves users bookmarks in files in JSON format
@@ -47,7 +50,8 @@ public class BookmarksGroupStorage implements Serializable {
     transient
     private final String fileName;
 
-
+    private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(5);
+    private static final int NOT_FOUND = 400;
 
     public BookmarksGroupStorage(String fileName) {
         this.groups = new HashMap<>();
@@ -57,6 +61,7 @@ public class BookmarksGroupStorage implements Serializable {
             FileCreator.createFile(fileName);
         }
     }
+
 
     public BookmarksGroupStorage(Map<String, BookmarksGroup> groups, String fileName) {
         this.groups = groups;
@@ -110,7 +115,7 @@ public class BookmarksGroupStorage implements Serializable {
             throw new NoSuchGroupException(String.format("There is no group %s.",
                     groupName));
         }
-        Bookmark toRemove =  groups.get(groupName).getBookmarks().stream().
+        Bookmark toRemove = groups.get(groupName).getBookmarks().stream().
                 filter(bookmark ->
                         bookmark.title().equalsIgnoreCase(bookmarkTitle)).
                 findFirst().orElse(null);
@@ -123,17 +128,7 @@ public class BookmarksGroupStorage implements Serializable {
         updateGroupsFile();
     }
 
-    public void cleanUp() {
-        try (ExecutorService executor = Executors.newCachedThreadPool();
-             HttpClient client = HttpClient.newBuilder().executor(executor).
-                     version(HttpClient.Version.HTTP_2).build()) {
-            for (Map.Entry<String, BookmarksGroup> groupEntry : groups.entrySet()) {
-                BookmarksGroup currentGroup = groupEntry.getValue();
-                handleInvalidBookmarks(executor, client, currentGroup);
-            }
-        }
-        updateGroupsFile();
-    }
+
 
     public List<Bookmark> importBookmarksFromChrome() {
         Map<String, BookmarksGroup> chromeGroups = ChromeImporter.importChromeGroups();
@@ -141,7 +136,7 @@ public class BookmarksGroupStorage implements Serializable {
             return null;   //exceptions have already been logged in the
             // methods of the ChromeImporter class, so not needed here
         }
-        for (Map.Entry<String, BookmarksGroup> groupEntry: chromeGroups.entrySet()) {
+        for (Map.Entry<String, BookmarksGroup> groupEntry : chromeGroups.entrySet()) {
             if (!groups.containsKey(groupEntry.getKey())) {
                 groups.put(groupEntry.getKey(), groupEntry.getValue());
             }
@@ -190,27 +185,72 @@ public class BookmarksGroupStorage implements Serializable {
         return Objects.hash(groups);
     }
 
-    private void handleInvalidBookmarks(ExecutorService executor, HttpClient client,
-                                        BookmarksGroup currentGroup) {
-        Set<Bookmark> invalidBookmarks = ConcurrentHashMap.newKeySet();
-        List<CompletableFuture<Void>> futures = currentGroup.getBookmarks().stream()
-                .map(bookmark -> CompletableFuture.supplyAsync(() -> {
-                    try {
-                        HttpRequest request = HttpRequest.newBuilder()
-                                .uri(URI.create(bookmark.url())).build();
-                        HttpResponse<String> response = client.send(request,
-                                HttpResponse.BodyHandlers.ofString());
-                        return response.statusCode();
-                    } catch (IOException | InterruptedException e) {
-                        ExceptionsLogger.logClientException(e);
-                        return -1;
-                    }
-                }, executor).thenAccept(statusCode -> {
-                    if (statusCode >= ERROR_STATUS_CODE) {
-                        invalidBookmarks.add(bookmark);}})).toList();
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-        synchronized (currentGroup.getBookmarks()) {
-            currentGroup.removeBookmarks(invalidBookmarks);
+
+    public int cleanUp() {
+
+        HttpClient client = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .version(HttpClient.Version.HTTP_2)
+                .connectTimeout(PROBE_TIMEOUT)
+                .build();
+
+        int removedTotal = 0;
+
+        for (BookmarksGroup group : groups.values()) {
+            var snapshot = new java.util.ArrayList<>(group.getBookmarks());
+            var badUrls = new java.util.HashSet<String>();
+
+            for (Bookmark bm : snapshot) {
+                int code = probeGet(client, bm.url());
+                if (code >= NOT_FOUND || code == -1) {
+                    badUrls.add(bm.url());
+                    System.err.println("Invalid url added: " + bm.url());
+                }
+            }
+
+            if (!badUrls.isEmpty()) {
+                int before = group.getBookmarks().size();
+                group.removeBookmarksByUrl(badUrls);
+                removedTotal += (before - group.getBookmarks().size());
+            }
+        }
+
+        if (removedTotal > 0) {
+            updateGroupsFile();
+            System.err.println("Group's file updated.");
+        }
+        return removedTotal;
+    }
+
+    String URL = "https://chatgpt.com/";
+
+    private int probeGet(HttpClient client, String url) {
+        final URI uri;
+        try {
+            uri = URI.create(url.trim());
+        } catch (IllegalArgumentException e) {
+            ExceptionsLogger.logClientException(e);
+            System.err.println("Uri never created!");
+            return -1;
+        }
+
+        try {
+            HttpRequest req = HttpRequest.newBuilder(uri)
+                    .GET()
+                    .timeout(PROBE_TIMEOUT)
+                    .build();
+            HttpResponse<Void> res = client.send(req, HttpResponse.BodyHandlers.discarding());
+            System.err.println("Status code: " + res.statusCode());
+            return res.statusCode();
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            ExceptionsLogger.logClientException(ie);
+            //System.err.println("InterruptedException: " + ie.getMessage());
+            return -1;
+        } catch (IOException ioe) {
+            ExceptionsLogger.logClientException(ioe);
+            //System.err.println("IOException: " + ioe.getMessage());
+            return -1;
         }
     }
 }

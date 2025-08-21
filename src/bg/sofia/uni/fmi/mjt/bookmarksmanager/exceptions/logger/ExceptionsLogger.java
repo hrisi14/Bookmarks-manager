@@ -31,4 +31,14 @@ public class ExceptionsLogger {
         Path path = Path.of(EXCEPTIONS_FILE);
         Files.deleteIfExists(path);
     }
+
+    public static void logSth(int sth) {
+        FileCreator.createFile(EXCEPTIONS_FILE);
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(EXCEPTIONS_FILE,true))) {
+            writer.append(Integer.toString(sth)).append(System.lineSeparator());
+        }  catch (IOException e) {
+            throw new RuntimeException( "Unexpected error occurred while exception logging!" + e);
+        }
+    }
 }

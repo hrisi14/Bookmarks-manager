@@ -1,0 +1,13 @@
+{
+  "groups": {
+    "Group1": {
+      "groupName": "Group1",
+      "bookmarks": {
+        "null": {
+          "url": "https://invalid-bookmark.com",
+          "groupName": "Group1"
+        }
+      }
+    }
+  }
+}

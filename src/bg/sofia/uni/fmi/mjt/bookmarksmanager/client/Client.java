@@ -43,7 +43,9 @@ public class Client {
             throws IOException {
         System.out.print("Enter message: ");
         String message = scanner.nextLine();
-        if (CommandTemplate.HELP.toString().equals(message)) {
+        //System.err.println(message);
+        //System.err.println(CommandTemplate.HELP);
+        if (CommandTemplate.HELP.getCommandValue().equals(message.trim())) {
             displayPossibleCommands();
             return false;
         }
@@ -53,7 +55,7 @@ public class Client {
         buffer.flip(); // switch to reading mode
         socketChannel.write(buffer); // buffer drain
         getServerMessage(socketChannel);
-        if (CommandTemplate.DISCONNECT.toString().equals(message)) {
+        if (CommandTemplate.DISCONNECT.getCommandValue().equals(message)) {
             System.out.println("Quiting communication with server.");
             socketChannel.close();
             return true;

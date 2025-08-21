@@ -21,7 +21,7 @@ public enum CommandTemplate {
         this.commandValue = commandValue;
     }
 
-    String getCommandValue() {
+    public String getCommandValue() {
         return commandValue;
     }
 }
