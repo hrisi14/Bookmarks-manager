@@ -128,8 +128,6 @@ public class BookmarksGroupStorage implements Serializable {
         updateGroupsFile();
     }
 
-
-
     public List<Bookmark> importBookmarksFromChrome() {
         Map<String, BookmarksGroup> chromeGroups = ChromeImporter.importChromeGroups();
         if (chromeGroups == null) {
@@ -221,8 +219,6 @@ public class BookmarksGroupStorage implements Serializable {
         }
         return removedTotal;
     }
-
-    String URL = "https://chatgpt.com/";
 
     private int probeGet(HttpClient client, String url) {
         final URI uri;

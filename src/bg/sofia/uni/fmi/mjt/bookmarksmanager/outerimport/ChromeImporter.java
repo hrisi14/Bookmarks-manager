@@ -15,8 +15,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ChromeImporter {
+
     private static final String WINDOWS_BOOKMARKS_PATH =  "\\AppData\\" +
-            "Local\\Google\\Chrome\\User Data\\Default\\Bookmarks";
+            "Local\\Google\\Chrome\\User Data\\Profile 9\\Bookmarks";
     private static final String LINUX_BOOKMARKS_PATH = "/.config/google-chrome/" +
             "Default/Bookmarks";
     private static final String MACOS_BOOKMARKS_PATH =  "/Library/Application" +
@@ -37,6 +38,7 @@ public class ChromeImporter {
         try {
             String chromeFile = findChromeBookmarksPath();
             if (chromeFile == null) {
+                System.err.println("ChromeFile is null");
                 return null;
             }
             FileReader reader = new FileReader(chromeFile);
@@ -48,6 +50,8 @@ public class ChromeImporter {
                         new HashMap<>());
                 JsonObject groupNode = entry.getValue().getAsJsonObject();
                 JsonArray children = groupNode.getAsJsonArray(BOOKMARKS_LIST_FIELD);
+                System.err.println("groupNode:  " + groupNode);
+                System.err.println("children:  " + children);
 
                 if (children != null) {
                     extractBookmarks(children, currentGroup);
@@ -56,6 +60,7 @@ public class ChromeImporter {
             }
         } catch (IOException e) {
             ExceptionsLogger.logClientException(e);
+            System.err.println("Exc when chromeFile opening:  " + e.getMessage());
             return null;
         }
         return chromeGroups;
@@ -71,8 +76,12 @@ public class ChromeImporter {
                 String url = bookmarkNode.get(URL_CHROME_FIELD).getAsString();
                 chromeGroup.addNewBookmark(new Bookmark(title, url, tokenizer.getKeywords(url),
                         chromeGroup.getGroupName()));
+
+                System.err.println("Title: " + title);
+                System.err.println("Url: " + url);
             } else if (FOLDER_CHROME_FIELD.equals(type)) {
                 JsonArray subChildren = bookmarkNode.getAsJsonArray(BOOKMARKS_LIST_FIELD);
+                System.err.println("Subchildren: " + subChildren);
                 if (subChildren != null) {
                     extractBookmarks(subChildren, chromeGroup);
                 }
@@ -85,6 +94,7 @@ public class ChromeImporter {
         String userHome = System.getProperty("user.home");
 
         if (osName.contains("windows")) {
+            System.err.println("Os is Windows.");
             return userHome + WINDOWS_BOOKMARKS_PATH;
         } else if (osName.contains("linux") || osName.contains("unix")) {  // Linux
             return userHome + LINUX_BOOKMARKS_PATH;

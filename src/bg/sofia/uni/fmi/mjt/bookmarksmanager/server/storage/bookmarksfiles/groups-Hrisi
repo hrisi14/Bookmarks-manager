@@ -1,7 +1,75 @@
 {
   "groups": {
-    "Group1": {
-      "groupName": "Group1",
+    "other": {
+      "groupName": "other",
+      "bookmarks": {}
+    },
+    "synced": {
+      "groupName": "synced",
+      "bookmarks": {}
+    },
+    "bookmark_bar": {
+      "groupName": "bookmark_bar",
+      "bookmarks": {
+        "Карти": {
+          "title": "Карти",
+          "url": "https://maps.google.com/",
+          "keywords": [
+            "от",
+            "ви",
+            "„бисквитки“",
+            "реклами",
+            "използваме",
+            "в",
+            "на",
+            "deutsch",
+            "и",
+            "englishunit",
+            "italiano",
+            "за",
+            "да",
+            "всички",
+            "съдържание"
+          ],
+          "groupName": "bookmark_bar"
+        },
+        "Gmail": {
+          "title": "Gmail",
+          "url": "https://accounts.google.com/b/0/AddMailService",
+          "keywords": [
+            "français",
+            "use",
+            "sign",
+            "type",
+            "mode",
+            "portuguê",
+            "unit",
+            "see",
+            "phone",
+            "english",
+            "guest",
+            "text",
+            "email",
+            "hear",
+            "account"
+          ],
+          "groupName": "bookmark_bar"
+        },
+        "YouTube": {
+          "title": "YouTube",
+          "url": "https://youtube.com/",
+          "keywords": [
+            "llc",
+            "2025",
+            "©",
+            "google"
+          ],
+          "groupName": "bookmark_bar"
+        }
+      }
+    },
+    "CustomGroup": {
+      "groupName": "CustomGroup",
       "bookmarks": {
         "Gymshark-Official-Store---Gym-Clothes-\u0026-Workout-Clothes": {
           "title": "Gymshark-Official-Store---Gym-Clothes-\u0026-Workout-Clothes",
@@ -23,7 +91,7 @@
             "gym",
             "regular"
           ],
-          "groupName": "Group1"
+          "groupName": "CustomGroup"
         },
         "GitHub-·-Build-and-ship-software-on-a-single,-collaborative-platform-·-GitHub": {
           "title": "GitHub-·-Build-and-ship-software-on-a-single,-collaborative-platform-·-GitHub",
@@ -45,10 +113,9 @@
             "support",
             "customer"
           ],
-          "groupName": "Group1"
+          "groupName": "CustomGroup"
         }
       }
     }
-  },
-  "URL": "https://chatgpt.com/"
+  }
 }
